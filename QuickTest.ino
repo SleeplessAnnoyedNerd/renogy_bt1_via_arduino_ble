@@ -184,6 +184,40 @@ void loop() {
         BLECharacteristic writeCharacteristic = peripheral.characteristic(WRITE_CHAR_UUID.c_str());
         if (writeCharacteristic) {
           Serial.println("use the writeCharacteristic");
+
+          const uint8_t request[] = { 255, 3, 1, 0, 0, 34, 209, 241 };
+
+          // (DEVICE_ID, READ_PARAMS["FUNCTION"], READ_PARAMS["REGISTER"], READ_PARAMS["WORDS"])
+          // WORDS ... 34
+          
+          // set_load:
+          //  request = create_request_payload(DEVICE_ID, WRITE_PARAMS_LOAD["FUNCTION"], WRITE_PARAMS_LOAD["REGISTER"], value)
+          // device_id, 255
+          // write_params_load, function, 3
+          // register, 256
+          // value, 0
+          // crc, 16 bit
+          writeCharacteristic.writeValue(request, 8);
+
+          /*
+          def create_request_payload(device_id, function, regAddr, readWrd):                             
+            data = None                                
+
+            if regAddr:
+                data = []
+                data.append(device_id)
+                data.append(function)
+                data.append(int_to_bytes(regAddr, 0))
+                data.append(int_to_bytes(regAddr, 1))
+                data.append(int_to_bytes(readWrd, 0))
+                data.append(int_to_bytes(readWrd, 1))
+
+                crc = libscrc.modbus(bytes(data))
+                data.append(int_to_bytes(crc, 1))
+                data.append(int_to_bytes(crc, 0))
+                logging.debug("{} {} => {}".format("create_read_request", regAddr, data))
+            return data
+          */
         } else {
           Serial.println("Peripheral does NOT have required service.");
         }
@@ -200,13 +234,28 @@ void loop() {
             Serial.println("notifyCharacteristic subscription failed!");
             peripheral.disconnect();
             return;
+          } else {
+            notifyCharacteristic.setEventHandler(BLERead, switchCharacteristicWritten);
           }
         } else {
           Serial.println("Peripheral does NOT have required service.");
         }
+
+        
       } else {
         Serial.println("Connection failed.");
       }
     }
+  }
+}
+
+void switchCharacteristicWritten(BLEDevice central, BLECharacteristic characteristic) {
+  // central wrote new value to characteristic, update LED
+  Serial.print("Characteristic event, read: ");
+
+  if (characteristic.value()) {
+    Serial.println("LED on");
+  } else {
+    Serial.println("LED off");
   }
 }
