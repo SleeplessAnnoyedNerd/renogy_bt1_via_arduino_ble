@@ -280,7 +280,7 @@ void loop() {
       String asJson = buildJson(valuesAsString);
       Serial.println(asJson);
 
-      if (mqttClient.publish("/renogy/b1", asJson)) {
+      if (mqttClient.publish(MQTT_TOPIC, asJson)) {
         Serial.println("MQTT publish was successful.");
       }
     }
