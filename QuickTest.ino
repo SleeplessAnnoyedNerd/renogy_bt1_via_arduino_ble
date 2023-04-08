@@ -1,32 +1,16 @@
-/*
-  Scan
 
-  This example scans for Bluetooth® Low Energy peripherals and prints out their advertising details:
-  address, local name, advertised service UUID's.
-
-  The circuit:
-  - Arduino MKR WiFi 1010, Arduino Uno WiFi Rev2 board, Arduino Nano 33 IoT,
-    Arduino Nano 33 BLE, or Arduino Nano 33 BLE Sense board.
-
-  This example code is in the public domain.
-*/
-
-// TODO
-// - Refactor, of course. But first it needs to work.
-
+//
 // In the BLE world, the central/peripheral difference is very easy to define and recognize: 
 //
 // Central - the BLE device which initiates an outgoing connection request to an advertising peripheral device. 
 // Peripheral - the BLE device which accepts an incoming connection request after advertising.
+//
 
 #include <ArduinoBLE.h>
-
 #include <WiFi.h>
-// #include <MQTT.h>
+#include <MQTT.h>  // https://github.com/256dpi/arduino-mqtt
 
 #include "secrets.h"
-
-const String ADDRESS = String("f0:f8:f2:6a:70:03");
 
 // For efficiency, the Bluetooth® Low Energy (BLE) specification adds support for shortened 16-bit UUIDs.
 // We work with BLE here... so we have to use 16-bit UUIDs (it seems).
@@ -42,6 +26,11 @@ BLECharacteristic notifyCharacteristic;
 BLECharacteristic writeCharacteristic;
 bool properlyConnected = false;
 int rePollCtr = 0;
+
+// ---
+
+WiFiClient net;
+MQTTClient mqttClient;
 
 // f000ffd1-0451-4000-b000-000000000000
 
@@ -178,6 +167,17 @@ void connect() {
   Serial.println("Wifi connected.");
 }
 
+void bleScan() {
+  // Serial.println("Bluetooth® Low Energy Central scan");
+  // start scanning for peripheral
+  // BLE.scan();
+  // BLE.scanForAddress(RENOGY_BT1_MAC_ADDRESS);
+  // BLE.scanForName("BT-TH-F26A7003");
+
+  Serial.println("\nBluetooth® Low Energy Central scan");
+  BLE.scanForAddress(RENOGY_BT1_MAC_ADDRESS);
+}
+
 void setup() {
   Serial.begin(9600);
   while (!Serial);
@@ -200,12 +200,14 @@ void setup() {
   
   Serial.println("}");
 
-  // Serial.print(ssid);
-  // Serial.print(" / ");
-  // Serial.println(pass);
+  Serial.print(ssid);
+  Serial.print(" / ");
+  Serial.println(pass);
   WiFi.begin(ssid, pass);
 
   connect();
+
+  mqttClient.begin(MQTT_SERVER_IP, MQTT_SERVER_PORT, net);
 
   // ---
 
@@ -224,11 +226,7 @@ void setup() {
     while (1);
   }
 
-  Serial.println("Bluetooth® Low Energy Central scan");
-  // start scanning for peripheral
-  // BLE.scan();
-  BLE.scanForAddress("f0:f8:f2:6a:70:03");
-  // BLE.scanForName("BT-TH-F26A7003");
+  bleScan();
 }
 
 void loop() {
@@ -255,13 +253,15 @@ void loop() {
       int count = notifyCharacteristic.readValue(values, 255);
 
       String *valuesAsString = decodeValues(values);
-      Serial.println(buildJson(valuesAsString));
+      String asJson = buildJson(valuesAsString);
+      Serial.println(asJson);
 
-      // send to MQTT :)
-      // need WIFI for that of course.
+      if (mqttClient.publish("/renogy/b1", asJson)) {
+        Serial.println("MQTT publish was successful.");
+      }
     }
 
-    if (rePollCtr++ > 10) {
+    if (rePollCtr++ > 15) {
       Serial.println("repolling...");
 
       rePollCtr = 0;
@@ -274,6 +274,9 @@ void loop() {
 
     return;
   }
+
+  // Serial.println("Bluetooth® Low Energy Central scan");
+  // BLE.scanForAddress(RENOGY_BT1_MAC_ADDRESS);
 
   // check if a peripheral has been discovered
   BLEDevice peripheral = BLE.available();
@@ -309,7 +312,7 @@ void loop() {
 
     Serial.println();
 
-    if (peripheral.address() == ADDRESS) {
+    if (peripheral.address() == RENOGY_BT1_MAC_ADDRESS) {
       Serial.println("BT-1 found.");
       BLE.stopScan(); // important, otherwise can't connect?
 
@@ -323,6 +326,7 @@ void loop() {
         } else {
           Serial.println("Attribute discovery failed!");
           peripheral.disconnect();
+          bleScan(); // rescan ...
           return;
         }
 
