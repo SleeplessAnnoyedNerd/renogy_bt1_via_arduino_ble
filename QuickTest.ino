@@ -30,7 +30,7 @@ int rePollCtr = 0;
 // ---
 
 WiFiClient net;
-MQTTClient mqttClient;
+MQTTClient mqttClient(1024);
 
 // f000ffd1-0451-4000-b000-000000000000
 
@@ -167,6 +167,21 @@ void connect() {
   Serial.println("Wifi connected.");
 }
 
+void bleStart() {
+  // Be sure that iOS is not connected.
+  // Kill iOS app if necessary.
+  // Sometimes at helps to connect via iOS first and kill the iOS app.
+
+  // BLE.debug(Serial);
+
+  // begin initialization
+  if (!BLE.begin()) {
+    Serial.println("starting Bluetooth® Low Energy module failed!");
+
+    while (1);
+  }
+}
+
 void bleScan() {
   // Serial.println("Bluetooth® Low Energy Central scan");
   // start scanning for peripheral
@@ -196,36 +211,45 @@ void setup() {
   //   Serial.println(values[i]);
   // }
 
-  Serial.println(buildJson(values));
+  String asJson = buildJson(values);
+  Serial.println(asJson);
   
   Serial.println("}");
 
   Serial.print(ssid);
   Serial.print(" / ");
   Serial.println(pass);
+
   WiFi.begin(ssid, pass);
 
   connect();
 
   mqttClient.begin(MQTT_SERVER_IP, MQTT_SERVER_PORT, net);
+  mqttClient.connect("Nan33IoT");
+
+  if (!mqttClient.connected()) {
+    Serial.println("MQTT not connected");
+  }
+
+  // mqttClient.publish("/hello", "world");
+  // mqttClient.publish(MQTT_TOPIC, "test");
+
+  if (mqttClient.publish(MQTT_TOPIC, asJson)) {
+    Serial.println("MQTT publish was successful.");
+  } else {
+    Serial.println("MQTT publish failed!");
+
+    Serial.println(mqttClient.lastError());
+    Serial.println(mqttClient.returnCode());
+  }
+
+  // return;
 
   // ---
 
   // order regading WIFI and BLE is important ... 
 
-  // Be sure that iOS is not connected.
-  // Kill iOS app if necessary.
-  // Sometimes at helps to connect via iOS first and kill the iOS app.
-
-  // BLE.debug(Serial);
-
-  // begin initialization
-  if (!BLE.begin()) {
-    Serial.println("starting Bluetooth® Low Energy module failed!");
-
-    while (1);
-  }
-
+  bleStart();
   bleScan();
 }
 
@@ -326,6 +350,9 @@ void loop() {
         } else {
           Serial.println("Attribute discovery failed!");
           peripheral.disconnect();
+
+          BLE.end();
+          bleStart();
           bleScan(); // rescan ...
           return;
         }
