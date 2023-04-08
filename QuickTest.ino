@@ -222,36 +222,37 @@ void loop() {
     if (notifyCharacteristic.valueUpdated()) {
       Serial.println("value updated");
 
-      Serial.println(notifyCharacteristic.valueLength()); // current
+      // Serial.println(notifyCharacteristic.valueLength()); // current
       // Serial.println(notifyCharacteristic.valueSize()); // maximum
 
-      byte value[255];
-      int count = notifyCharacteristic.readValue(value, 255);
+      byte values[255];
+      int count = notifyCharacteristic.readValue(values, 255);
 
-      for (int i = 0; i < count; i++) {
-        Serial.print(value[i], HEX);
-        Serial.print(" ");
-      }  
+      // for (int i = 0; i < count; i++) {
+      //   Serial.print(values[i], HEX);
+      //   Serial.print(" ");
+      // }  
 
-      Serial.println();
+      // Serial.println();
 
-      Serial.println(value[3] * 256 + value[4]); // battery_percentage
-      Serial.println((value[5] * 256 + value[6]) * 0.1); // battery_voltage
-      Serial.println((value[17] * 256 + value[18]) * 0.1); // pv_voltage
-      Serial.println((value[19] * 256 + value[20]) * 0.01); // pv_current
-      Serial.println(value[68]); // charging_status
+      // Serial.println(value[3] * 256 + value[4]); // battery_percentage
+      // Serial.println((value[5] * 256 + value[6]) * 0.1); // battery_voltage
+      // Serial.println((value[17] * 256 + value[18]) * 0.1); // pv_voltage
+      // Serial.println((value[19] * 256 + value[20]) * 0.01); // pv_current
+      // Serial.println(value[68]); // charging_status
 
-      Serial.println(bytes_to_int_16(value, 19)* 0.01); // pv_current
-      Serial.println(decodeChargingState(value[68])); // charging_state
+      // Serial.println(bytes_to_int_16(value, 19)* 0.01); // pv_current
+      // Serial.println(decodeChargingState(value[68])); // charging_state
 
-      // execute write after x iterations ...
-      // build JSON
+      String *valuesAsString = decodeValues(values);
+      Serial.println(buildJson(valuesAsString));
+
       // send to MQTT :)
     }
 
     if (rePollCtr++ > 10) {
       Serial.println("repolling...");
-      
+
       rePollCtr = 0;
   
       const uint8_t request[] = { 255, 3, 1, 0, 0, 34, 209, 241 };
