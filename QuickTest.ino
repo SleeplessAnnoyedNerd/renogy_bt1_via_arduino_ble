@@ -36,6 +36,7 @@ BLEDevice thePeripheral;
 BLECharacteristic notifyCharacteristic;
 BLECharacteristic writeCharacteristic;
 bool properlyConnected = false;
+int rePollCtr = 0;
 
 // f000ffd1-0451-4000-b000-000000000000
 
@@ -197,9 +198,9 @@ void setup() {
 
   Serial.println("TEST {");
   String *values = decodeValues(SAMPLE_RESPONSE);
-  for (int i = 0; i < 21; i++) {
-    Serial.println(values[i]);
-  }
+  // for (int i = 0; i < 21; i++) {
+  //   Serial.println(values[i]);
+  // }
 
   Serial.println(buildJson(values));
   
@@ -207,7 +208,7 @@ void setup() {
 }
 
 void loop() {
-  return; // for testing
+  // return; // for testing
 
   if (properlyConnected) {
     // nothing to do anymore ... event handler takes over...
@@ -246,6 +247,17 @@ void loop() {
       // execute write after x iterations ...
       // build JSON
       // send to MQTT :)
+    }
+
+    if (rePollCtr++ > 10) {
+      Serial.println("repolling...");
+      
+      rePollCtr = 0;
+  
+      const uint8_t request[] = { 255, 3, 1, 0, 0, 34, 209, 241 };
+      if (!writeCharacteristic.writeValue(request, 8, true)) {
+        Serial.println("write failed.");
+      }      
     }
 
     return;
