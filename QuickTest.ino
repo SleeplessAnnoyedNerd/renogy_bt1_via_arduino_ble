@@ -21,6 +21,11 @@
 
 #include <ArduinoBLE.h>
 
+#include <WiFi.h>
+// #include <MQTT.h>
+
+#include "secrets.h"
+
 const String ADDRESS = String("f0:f8:f2:6a:70:03");
 
 // For efficiency, the Bluetooth® Low Energy (BLE) specification adds support for shortened 16-bit UUIDs.
@@ -164,29 +169,18 @@ String buildJson(String decodedValues[]) {
 
 // ----
 
+void connect() {
+  Serial.println("checking wifi...");
+  while (WiFi.status() != WL_CONNECTED) {
+    Serial.print(".");
+    delay(1000);
+  }
+  Serial.println("Wifi connected.");
+}
+
 void setup() {
   Serial.begin(9600);
   while (!Serial);
-
-  // BLE.debug(Serial);
-
-  // begin initialization
-  if (!BLE.begin()) {
-    Serial.println("starting Bluetooth® Low Energy module failed!");
-
-    while (1);
-  }
-
-  Serial.println("Bluetooth® Low Energy Central scan");
-
-  // Be sure that iOS is not connected.
-  // Kill iOS app if necessary.
-  // Sometimes at helps to connect via iOS first and kill the iOS app.
-
-  // start scanning for peripheral
-  // BLE.scan();
-  BLE.scanForAddress("f0:f8:f2:6a:70:03");
-  // BLE.scanForName("BT-TH-F26A7003");
 
   // TEST
   const byte SAMPLE_RESPONSE[] = {
@@ -205,10 +199,42 @@ void setup() {
   Serial.println(buildJson(values));
   
   Serial.println("}");
+
+  // Serial.print(ssid);
+  // Serial.print(" / ");
+  // Serial.println(pass);
+  WiFi.begin(ssid, pass);
+
+  connect();
+
+  // ---
+
+  // order regading WIFI and BLE is important ... 
+
+  // Be sure that iOS is not connected.
+  // Kill iOS app if necessary.
+  // Sometimes at helps to connect via iOS first and kill the iOS app.
+
+  // BLE.debug(Serial);
+
+  // begin initialization
+  if (!BLE.begin()) {
+    Serial.println("starting Bluetooth® Low Energy module failed!");
+
+    while (1);
+  }
+
+  Serial.println("Bluetooth® Low Energy Central scan");
+  // start scanning for peripheral
+  // BLE.scan();
+  BLE.scanForAddress("f0:f8:f2:6a:70:03");
+  // BLE.scanForName("BT-TH-F26A7003");
 }
 
 void loop() {
   // return; // for testing
+
+  // Serial.println("looping");
 
   if (properlyConnected) {
     // nothing to do anymore ... event handler takes over...
@@ -228,26 +254,11 @@ void loop() {
       byte values[255];
       int count = notifyCharacteristic.readValue(values, 255);
 
-      // for (int i = 0; i < count; i++) {
-      //   Serial.print(values[i], HEX);
-      //   Serial.print(" ");
-      // }  
-
-      // Serial.println();
-
-      // Serial.println(value[3] * 256 + value[4]); // battery_percentage
-      // Serial.println((value[5] * 256 + value[6]) * 0.1); // battery_voltage
-      // Serial.println((value[17] * 256 + value[18]) * 0.1); // pv_voltage
-      // Serial.println((value[19] * 256 + value[20]) * 0.01); // pv_current
-      // Serial.println(value[68]); // charging_status
-
-      // Serial.println(bytes_to_int_16(value, 19)* 0.01); // pv_current
-      // Serial.println(decodeChargingState(value[68])); // charging_state
-
       String *valuesAsString = decodeValues(values);
       Serial.println(buildJson(valuesAsString));
 
       // send to MQTT :)
+      // need WIFI for that of course.
     }
 
     if (rePollCtr++ > 10) {
