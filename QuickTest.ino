@@ -178,36 +178,53 @@ void loop() {
   }
 
   // check if a peripheral has been discovered
-  BLEDevice peripheral = BLE.available();
+  handleBlePeripheral(BLE.available());
+}
 
+void switchCharacteristicWritten(BLEDevice central, BLECharacteristic characteristic) {
+  // central wrote new value to characteristic, update LED
+  Serial.print("Characteristic event, read: ");
+
+  if (characteristic.value()) {
+    Serial.println("LED on");
+  } else {
+    Serial.println("LED off");
+  }
+}
+
+void dumpBlePeripheral(BLEDevice peripheral) {
+  Serial.print("Discovered a peripheral: ");
+
+  // print address
+  Serial.print("Address: ");
+  Serial.print(peripheral.address());
+
+  // print the local name, if present
+  if (peripheral.hasLocalName()) {
+    Serial.print(" / Local Name: ");
+    Serial.print(peripheral.localName());
+  }
+
+  // print the advertised service UUIDs, if present
+  if (peripheral.hasAdvertisedServiceUuid()) {
+    Serial.print(" / Service UUIDs: ");
+    for (int i = 0; i < peripheral.advertisedServiceUuidCount(); i++) {
+      Serial.print(peripheral.advertisedServiceUuid(i));
+      Serial.print(" ");
+    }
+    Serial.println();
+  }
+
+  Serial.print(" / RSSI: ");
+  Serial.print(peripheral.rssi());
+
+  Serial.println();
+}
+
+void handleBlePeripheral(BLEDevice peripheral) {
   if (peripheral) {
     // discovered a peripheral
-    Serial.print("Discovered a peripheral: ");
-
-    // print address
-    Serial.print("Address: ");
-    Serial.print(peripheral.address());
-
-    // print the local name, if present
-    if (peripheral.hasLocalName()) {
-      Serial.print(" / Local Name: ");
-      Serial.print(peripheral.localName());
-    }
-
-    // print the advertised service UUIDs, if present
-    if (peripheral.hasAdvertisedServiceUuid()) {
-      Serial.print(" / Service UUIDs: ");
-      for (int i = 0; i < peripheral.advertisedServiceUuidCount(); i++) {
-        Serial.print(peripheral.advertisedServiceUuid(i));
-        Serial.print(" ");
-      }
-      Serial.println();
-    }
-
-    Serial.print(" / RSSI: ");
-    Serial.print(peripheral.rssi());
-
-    Serial.println();
+    dumpBlePeripheral(peripheral);
 
     if (peripheral.address() == RENOGY_BT1_MAC_ADDRESS) {
       Serial.println("BT-1 found.");
@@ -299,7 +316,6 @@ void loop() {
 
               // starting with 2a2a garbage is delivered. maybe no strings anymore.
             }
-
           }        
         }
 
@@ -345,7 +361,7 @@ void loop() {
           const uint8_t request[] = { 255, 3, 1, 0, 0, 34, 209, 241 };
           
           if (!writeCharacteristic.writeValue(request, 8, true)) {
-            Serial.println("write failed.");
+            Serial.println("write characteristic failed.");
           }
 
           /*
@@ -380,16 +396,5 @@ void loop() {
         Serial.println("Connection failed.");
       }
     }
-  }
-}
-
-void switchCharacteristicWritten(BLEDevice central, BLECharacteristic characteristic) {
-  // central wrote new value to characteristic, update LED
-  Serial.print("Characteristic event, read: ");
-
-  if (characteristic.value()) {
-    Serial.println("LED on");
-  } else {
-    Serial.println("LED off");
   }
 }
