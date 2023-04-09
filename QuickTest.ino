@@ -1,11 +1,4 @@
 
-//
-// In the BLE world, the central/peripheral difference is very easy to define and recognize: 
-//
-// Central - the BLE device which initiates an outgoing connection request to an advertising peripheral device. 
-// Peripheral - the BLE device which accepts an incoming connection request after advertising.
-//
-
 #include <ArduinoBLE.h>
 #include <WiFi.h>
 #include <MQTT.h>  // https://github.com/256dpi/arduino-mqtt
@@ -27,7 +20,7 @@ BLECharacteristic writeCharacteristic;
 bool properlyConnected = false;
 int rePollCtr = 0;
 
-int status = WL_IDLE_STATUS;
+int wifiStatus = WL_IDLE_STATUS;
 bool networkInitialized = false;
 bool wifiModeFlag = false;
 
@@ -59,7 +52,7 @@ String decodeChargingState(byte b) {
     String("current limiting")
   };
 
-  return CHARGING_STATE[b]; // TODO change range!
+  return CHARGING_STATE[b]; // TODO check range!
 }
 
 String decodeLoadState(byte b) {
@@ -178,22 +171,15 @@ void bleStart() {
 
   // BLE.debug(Serial);
 
-  // begin initialization
   if (!BLE.begin()) {
-    Serial.println("starting Bluetooth® Low Energy module failed!");
+    Serial.println("Starting Bluetooth Low Energy module failed!");
 
     while (1);
   }
 }
 
 void bleScan() {
-  // Serial.println("Bluetooth® Low Energy Central scan");
-  // start scanning for peripheral
-  // BLE.scan();
-  // BLE.scanForAddress(RENOGY_BT1_MAC_ADDRESS);
-  // BLE.scanForName("BT-TH-F26A7003");
-
-  Serial.println("Bluetooth® Low Energy Central scan");
+  Serial.println("BLE Central scan");
   BLE.scanForAddress(RENOGY_BT1_MAC_ADDRESS);
   // BLE.scan();
 }
@@ -259,7 +245,7 @@ void initMqtt() {
   //   Serial.println(mqttClient.returnCode());
   // }
 
-  mqttClient.loop();
+  // mqttClient.loop();
 }
 
 void setup() {
@@ -274,53 +260,35 @@ void loop() {
 
   // Serial.println("looping");
 
-  // if (mqttClient.connected()) {
-  //   mqttClient.loop();
-  // }
-  
-  if( !networkInitialized )
-  {
-    if( !wifiModeFlag )
-    {
-      Serial.print( "Switch to BLE: " );
-      if( !switch2BleMode() )
-      {
-        Serial.println( "failed" );
-      }
-      else
-      {
+  if (!networkInitialized) {
+    if (!wifiModeFlag) {
+      Serial.print("Switch to BLE: ");
+      if (!switch2BleMode()) {
+        Serial.println("failed");
+      } else {
         networkInitialized = true;
-        Serial.println( "success" );
+        Serial.println("success");
       }
-    }
-    else
-    {
-      Serial.print( "Switch to WiFi: " );
-      if( !switch2WiFiMode() )
-      {
-        Serial.println( "failed" );
-      }
-      else
-      {
+    } else {
+      Serial.print("Switch to WiFi: ");
+      if (!switch2WiFiMode()) {
+        Serial.println("failed");
+      } else {
         networkInitialized = true;
-        Serial.println( "success" );
+        Serial.println("success");
 
-        networkInitialized = false,
-        wifiModeFlag = false;
+        networkInitialized = false, wifiModeFlag = false;
 
         delay(1000);
       }
     }
   } else {
-    if( !wifiModeFlag )
-    {
+    if (!wifiModeFlag) {
       // Serial.println("BLE mode...");
       // bleMode();
       BLE.poll(500);
-    }
-    else
-    {
-    // wifiMode();
+    } else {
+      // wifiMode();
     }
   }
 
@@ -672,35 +640,29 @@ bool switch2BleMode() {
   return true;
 }
 
-
-void wifiMode()
-{
+void wifiMode() {
   int connectCount = 0;
 
-  if ( status != WL_CONNECTED )
-  {
-    while ( status != WL_CONNECTED )
-    {
+  if (wifiStatus != WL_CONNECTED) {
+    while (wifiStatus != WL_CONNECTED) {
       connectCount++;
-      Serial.print( "WiFi attempt: " );
-      Serial.println( connectCount );
+      Serial.print("WiFi attempt: ");
+      Serial.println(connectCount);
 
-      if( connectCount > 10 )
-      {
+      if (connectCount > 10) {
         networkInitialized = false;
         wifiModeFlag = false;
-        Serial.println( "WiFi connection failed" );
+        Serial.println("WiFi connection failed");
         return;
       }
-      Serial.print( "Attempting to connect to SSID: " );
-      Serial.println( ssid );
+      
+      Serial.print("Attempting to connect to SSID: ");
+      Serial.println(ssid);
 
-      status = WiFi.begin( ssid, pass );
+      wifiStatus = WiFi.begin(ssid, pass);
 
-      if( status != WL_CONNECTED )
-      {
-        // wait 10 seconds for connection:
-        delay( 10000 );
+      if (wifiStatus != WL_CONNECTED) {
+        delay(10000); // wait 10 seconds for connection
       }
     }
 
@@ -714,7 +676,7 @@ bool switch2WiFiMode() {
   BLE.disconnect();
   BLE.end();
 
-  status = WL_IDLE_STATUS;
+  wifiStatus = WL_IDLE_STATUS;
 
   // Re-initialize the WiFi driver
   // This is currently necessary to switch from BLE to WiFi
@@ -725,20 +687,15 @@ bool switch2WiFiMode() {
 }
 
 void printWiFiStatus() {
-  Serial.print( "SSID: " );
-  Serial.println( WiFi.SSID() );
+  Serial.print("SSID: ");
+  Serial.println(WiFi.SSID());
 
   IPAddress ip = WiFi.localIP();
-  Serial.print( "IP address: " );
-  Serial.println( ip );
+  Serial.print("IP address: ");
+  Serial.println(ip);
 
   long rssi = WiFi.RSSI();
-  Serial.print( "Signal strength (RSSI):" );
-  Serial.print( rssi );
-  Serial.println( " dBm" );
+  Serial.print("Signal strength (RSSI):");
+  Serial.print(rssi);
+  Serial.println(" dBm");
 }
-
-void pumpMqttMesssage() {
-
-}
-
