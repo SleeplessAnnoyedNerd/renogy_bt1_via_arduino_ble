@@ -103,82 +103,89 @@ void loop() {
   }
 
   if (properlyConnected) {
-    // nothing to do anymore ... event handler takes over...
-
-    thePeripheral.poll(500);
-
-    BLE.poll(500);
-
-    if (notifyCharacteristic.valueUpdated()) {
-      Serial.println("value updated");
-
-      // Serial.println(notifyCharacteristic.valueLength()); // current
-      // Serial.println(notifyCharacteristic.valueSize()); // maximum
-
-      byte values[255];
-      int count = notifyCharacteristic.readValue(values, 255);
-
-      String *valuesAsString = decodeValues(values);
-      String asJson = buildJson(valuesAsString);
-      Serial.println(asJson);
-
-      Serial.println("Need to switch from BLE to WiFi");
-
-      properlyConnected = false; // since we disconnect from Bluetooth/BLE device
-      switch2WiFiMode();
-      wifiMode(ssid, pass);
-
-      Serial.println("MQTT");
-
-      initMqtt();
-      
-      if (!mqttClient.connected()) {
-        Serial.println("MQTT not connected, reconnecting");
-        if (mqttClient.connect(MQTT_CLIENT_ID)) {
-          Serial.println("MQTT reconnected");
-        } else {
-          Serial.println("MQTT reconnect failed");
-        }
-      } else {
-        Serial.println("MQTT is connected");
-      }
-
-      if (mqttClient.publish(MQTT_TOPIC, asJson)) {
-        Serial.println("MQTT publish was successful.");
-      } else {
-        Serial.println("MQTT publish failed!");
-
-        Serial.print("MQTT lastError / returnCode: ");
-        Serial.print(mqttClient.lastError());
-        Serial.print(" ");
-        Serial.println(mqttClient.returnCode());
-      }
-
-      mqttClient.loop();
-
-      delay(1000);
-
-      mqttClient.disconnect();
-
-      switch2BleMode(ENABLE_BLE_DEBUG, BLE_DEVICE_NAME, BLE_LOCAL_NAME, bleScan); // Switch back to BLE.
-    }
-
-    if (rePollCtr++ > 15) {
-      Serial.println("repolling...");
-
-      rePollCtr = 0;
-  
-      const uint8_t request[] = { 255, 3, 1, 0, 0, 34, 209, 241 };
-      if (!writeCharacteristic.writeValue(request, 8, true)) {
-        Serial.println("BLE characteristic write failed.");
-      }      
-    }
+    processDataFromBt1();
 
     return;
   }
 
   // check if a peripheral has been discovered
-  handleBlePeripheral(BLE.available());
+  BLEDevice peripheral = BLE.available();
+  if (peripheral) {
+    handleBlePeripheral(peripheral);
+  }
+}
+
+void processDataFromBt1() {
+  // nothing to do anymore ... event handler takes over... wrong. :(
+
+  thePeripheral.poll(500);
+
+  BLE.poll(500);
+
+  if (notifyCharacteristic.valueUpdated()) {
+    Serial.println("value updated");
+
+    // Serial.println(notifyCharacteristic.valueLength()); // current
+    // Serial.println(notifyCharacteristic.valueSize()); // maximum
+
+    byte values[255];
+    int count = notifyCharacteristic.readValue(values, 255);
+
+    String *valuesAsString = decodeValues(values);
+    String asJson = buildJson(valuesAsString);
+    Serial.println(asJson);
+
+    Serial.println("Need to switch from BLE to WiFi");
+
+    properlyConnected = false; // since we disconnect from Bluetooth/BLE device
+    switch2WiFiMode();
+    wifiMode(ssid, pass);
+
+    Serial.println("MQTT");
+
+    initMqtt();
+    
+    if (!mqttClient.connected()) {
+      Serial.println("MQTT not connected, reconnecting");
+      if (mqttClient.connect(MQTT_CLIENT_ID)) {
+        Serial.println("MQTT reconnected");
+      } else {
+        Serial.println("MQTT reconnect failed");
+      }
+    } else {
+      Serial.println("MQTT is connected");
+    }
+
+    if (mqttClient.publish(MQTT_TOPIC, asJson)) {
+      Serial.println("MQTT publish was successful.");
+    } else {
+      Serial.println("MQTT publish failed!");
+
+      Serial.print("MQTT lastError / returnCode: ");
+      Serial.print(mqttClient.lastError());
+      Serial.print(" ");
+      Serial.println(mqttClient.returnCode());
+    }
+
+    mqttClient.loop();
+
+    delay(1000);
+
+    mqttClient.disconnect();
+
+    switch2BleMode(ENABLE_BLE_DEBUG, BLE_DEVICE_NAME, BLE_LOCAL_NAME, bleScan); // Switch back to BLE.
+  }
+
+  if (rePollCtr++ > 15) {
+    Serial.println("repolling...");
+
+    rePollCtr = 0;
+
+    const uint8_t request[] = { 255, 3, 1, 0, 0, 34, 209, 241 };
+    if (!writeCharacteristic.writeValue(request, 8, true)) {
+      Serial.println("BLE characteristic write failed.");
+    }      
+  }
 }
 
 void switchCharacteristicWritten(BLEDevice central, BLECharacteristic characteristic) {
