@@ -31,28 +31,19 @@ bool wifiModeFlag = false;
 WiFiClient net;
 MQTTClient mqttClient(1024);
 
-// f000ffd1-0451-4000-b000-000000000000
-
 // ----
 
-void connect() {
-  Serial.println("checking wifi...");
-  while (WiFi.status() != WL_CONNECTED) {
-    Serial.print(".");
-    delay(1000);
-  }
-  Serial.println("Wifi connected.");
-}
-
 void bleStart() {
-  // Be sure that iOS is not connected.
+  // Be sure that iOS is not connected to Renogy BT-1.
   // Kill iOS app if necessary.
   // Sometimes at helps to connect via iOS first and kill the iOS app.
 
-  // BLE.debug(Serial);
+  if (ENABLE_BLE_DEBUG) {
+      BLE.debug(Serial);
+  }
 
   if (!BLE.begin()) {
-    Serial.println("Starting Bluetooth Low Energy module failed!");
+    Serial.println("Starting BLE module failed!");
 
     while (1);
   }
@@ -64,7 +55,7 @@ void bleScan() {
   // BLE.scan();
 }
 
-void messageReceived(String &topic, String &payload) {
+void mqttMessageReceived(String &topic, String &payload) {
   Serial.println("incoming: " + topic + " - " + payload);
 
   // Note: Do not use the client in the callback to publish, subscribe or
@@ -77,37 +68,19 @@ void initMqtt() {
   Serial.println("MQTT");
 
   mqttClient.begin(MQTT_SERVER_IP, MQTT_SERVER_PORT, net);
-  mqttClient.onMessage(messageReceived);
-  mqttClient.connect("Nano33IoT");
+  // mqttClient.onMessage(mqttMessageReceived);
+  mqttClient.connect(MQTT_CLIENT_ID);
 
   if (!mqttClient.connected()) {
     Serial.println("MQTT not connected");
   } else {
     Serial.println("MQTT connected");
   }
-
-  // mqttClient.loop();
-
-  // mqttClient.publish("/hello", "world");
-  // mqttClient.publish(MQTT_TOPIC, "test");
-
-  // if (mqttClient.publish(MQTT_TOPIC, "ping")) { // TODO
-  //   Serial.println("MQTT publish was successful.");
-  // } else {
-  //   Serial.println("MQTT publish failed!");
-
-  //   Serial.println(mqttClient.lastError());
-  //   Serial.println(mqttClient.returnCode());
-  // }
-
-  // mqttClient.loop();
 }
 
 void setup() {
   Serial.begin(9600);
   while (!Serial);
-
-  // test();
 }
 
 void loop() {
@@ -132,7 +105,8 @@ void loop() {
         networkInitialized = true;
         Serial.println("success");
 
-        networkInitialized = false, wifiModeFlag = false;
+        networkInitialized = false;
+        wifiModeFlag = false;
 
         delay(1000);
       }
@@ -147,28 +121,12 @@ void loop() {
     }
   }
 
-  // if (!mqttClient.connected()) {
-  //   Serial.println("MQTT not connected, reconnecting");
-
-  //   mqttClient.disconnect();
-  //   // mqttClient.begin(MQTT_SERVER_IP, MQTT_SERVER_PORT, net);
-  //   // mqttClient.onMessage(messageReceived);
-  //   mqttClient.connect("Nano33IoT");
-  // } else {
-  //   // Serial.println("MQTT connected");
-  // }
-
-  // mqttClient.loop();
-  // // mqttClient.publish(MQTT_TOPIC, "ping");
-
   if (properlyConnected) {
     // nothing to do anymore ... event handler takes over...
 
     thePeripheral.poll(500);
 
     BLE.poll(500);
-
-    // Serial.println("looping...");
 
     if (notifyCharacteristic.valueUpdated()) {
       Serial.println("value updated");
@@ -183,9 +141,9 @@ void loop() {
       String asJson = buildJson(valuesAsString);
       Serial.println(asJson);
 
-      Serial.println("Need to switch...");
+      Serial.println("Need to switch from BLE to WiFi");
 
-      properlyConnected = false;
+      properlyConnected = false; // since we disconnect from Bluetooth/BLE device
       switch2WiFiMode();
       wifiMode();
 
@@ -195,10 +153,10 @@ void loop() {
       
       if (!mqttClient.connected()) {
         Serial.println("MQTT not connected, reconnecting");
-        if (mqttClient.connect("Nano33IoT")) {
-          Serial.println("MQTT connected");
+        if (mqttClient.connect(MQTT_CLIENT_ID)) {
+          Serial.println("MQTT reconnected");
         } else {
-          Serial.println("Reconnect failed");
+          Serial.println("MQTT reconnect failed");
         }
       } else {
         Serial.println("MQTT is connected");
@@ -209,7 +167,9 @@ void loop() {
       } else {
         Serial.println("MQTT publish failed!");
 
-        Serial.println(mqttClient.lastError());
+        Serial.print("MQTT lastError / returnCode: ");
+        Serial.print(mqttClient.lastError());
+        Serial.print(" ");
         Serial.println(mqttClient.returnCode());
       }
 
@@ -219,7 +179,7 @@ void loop() {
 
       mqttClient.disconnect();
 
-      switch2BleMode();
+      switch2BleMode(); // Switch back to BLE.
     }
 
     if (rePollCtr++ > 15) {
@@ -229,15 +189,12 @@ void loop() {
   
       const uint8_t request[] = { 255, 3, 1, 0, 0, 34, 209, 241 };
       if (!writeCharacteristic.writeValue(request, 8, true)) {
-        Serial.println("write failed.");
+        Serial.println("BLE characteristic write failed.");
       }      
     }
 
     return;
   }
-
-  // Serial.println("Bluetooth® Low Energy Central scan");
-  // BLE.scanForAddress(RENOGY_BT1_MAC_ADDRESS);
 
   // check if a peripheral has been discovered
   BLEDevice peripheral = BLE.available();
@@ -266,7 +223,6 @@ void loop() {
       Serial.println();
     }
 
-    // print the RSSI
     Serial.print(" / RSSI: ");
     Serial.print(peripheral.rssi());
 
@@ -290,6 +246,7 @@ void loop() {
           BLE.end();
           bleStart();
           bleScan(); // rescan ...
+
           return;
         }
 
@@ -442,7 +399,7 @@ void loop() {
         thePeripheral = peripheral;
 
         properlyConnected = true;
-        Serial.println("properlyConnected");
+        Serial.println("Connected to BLE device.");
       } else {
         Serial.println("Connection failed.");
       }
@@ -465,29 +422,13 @@ void switchCharacteristicWritten(BLEDevice central, BLECharacteristic characteri
 
 bool switch2BleMode() {
   Serial.println("switch2BleMode");
-  // if ( !BLE.begin() )
-  // {
-  //   return false;
-  // }
 
   WiFi.end();
   wiFiDrv.wifiDriverDeinit();
 
-  // set advertised local name and service UUID:
-  BLE.setDeviceName( "Arduino Nano 33 IoT" );
-  BLE.setLocalName( "Arduino Nano 33 IoT" );
-  // BLE.setAdvertisedService( networkConfigService );
-
-  // add the characteristic to the service
-  // networkConfigService.addCharacteristic( networkEnableCharacteristic );
-
-  // add service
-  // BLE.addService( networkConfigService );
-
-  // set the initial value for the characeristic:
-  // networkEnableCharacteristic.writeValue( false );
-
-  // BLE.advertise();
+  // set advertised local name and service UUID
+  BLE.setDeviceName(BLE_DEVICE_NAME);
+  BLE.setLocalName(BLE_LOCAL_NAME);
 
   bleStart();
   bleScan();  
