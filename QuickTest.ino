@@ -3,6 +3,7 @@
 #include <WiFi.h>
 #include <MQTT.h>  // https://github.com/256dpi/arduino-mqtt
 
+#include "wifi_vs_ble.hpp"
 #include "renogy_bt1.hpp"
 
 #include "secrets.h"
@@ -22,32 +23,12 @@ BLECharacteristic writeCharacteristic;
 bool properlyConnected = false;
 int rePollCtr = 0;
 
-int wifiStatus = WL_IDLE_STATUS;
-bool networkInitialized = false;
-bool wifiModeFlag = false;
-
 // ---
 
 WiFiClient net;
 MQTTClient mqttClient(1024);
 
 // ----
-
-void bleStart() {
-  // Be sure that iOS is not connected to Renogy BT-1.
-  // Kill iOS app if necessary.
-  // Sometimes at helps to connect via iOS first and kill the iOS app.
-
-  if (ENABLE_BLE_DEBUG) {
-      BLE.debug(Serial);
-  }
-
-  if (!BLE.begin()) {
-    Serial.println("Starting BLE module failed!");
-
-    while (1);
-  }
-}
 
 void bleScan() {
   Serial.println("BLE Central scan");
@@ -91,7 +72,7 @@ void loop() {
   if (!networkInitialized) {
     if (!wifiModeFlag) {
       Serial.print("Switch to BLE: ");
-      if (!switch2BleMode()) {
+      if (!switch2BleMode(ENABLE_BLE_DEBUG, BLE_DEVICE_NAME, BLE_LOCAL_NAME, bleScan)) {
         Serial.println("failed");
       } else {
         networkInitialized = true;
@@ -145,7 +126,7 @@ void loop() {
 
       properlyConnected = false; // since we disconnect from Bluetooth/BLE device
       switch2WiFiMode();
-      wifiMode();
+      wifiMode(ssid, pass);
 
       Serial.println("MQTT");
 
@@ -179,7 +160,7 @@ void loop() {
 
       mqttClient.disconnect();
 
-      switch2BleMode(); // Switch back to BLE.
+      switch2BleMode(ENABLE_BLE_DEBUG, BLE_DEVICE_NAME, BLE_LOCAL_NAME, bleScan); // Switch back to BLE.
     }
 
     if (rePollCtr++ > 15) {
@@ -244,7 +225,7 @@ void loop() {
           peripheral.disconnect();
 
           BLE.end();
-          bleStart();
+          bleStart(ENABLE_BLE_DEBUG);
           bleScan(); // rescan ...
 
           return;
@@ -335,26 +316,19 @@ void loop() {
             peripheral.disconnect();
             return;
           } else {
+            // TODO Not working it seems, event handler never gets triggered.
+            // That's also the reason why we use value updated.
             notifyCharacteristic.setEventHandler(BLESubscribed | BLEUnsubscribed | BLERead | BLEWritten | BLENotify, switchCharacteristicWritten);
           }
         } else {
           Serial.println("Peripheral does NOT have required service.");
         }
-
-        // https://diysolarforum.com/threads/renogy-devices-and-raspberry-pi-bluetooth-wifi.30235/page-6
-        // das ist gut, weil da sind die notwendigen bytes drin :)
-        // ist aber BT-2 :(
-        // DEBUG: create_poll_request BatteryParamInfo => [255, 3, 1, 0, 0, 7, 16, 42]
-        // DEBUG: [regulator] Writing data to 0000ffd1-0000-1000-8000-00805f9b34fb - [255, 3, 1, 0, 0, 7, 16, 42] (ff0301000007102a)
-        // ----
-        // https://forum.fhem.de/index.php?topic=121750.15
-        // gatt tool...
         
         writeCharacteristic = peripheral.characteristic(WRITE_CHAR_UUID.c_str());
         if (writeCharacteristic) {
           Serial.println("use the writeCharacteristic");
 
-          const uint8_t request[] = { 255, 3, 1, 0, 0, 34, 209, 241 };
+          // Borrowed from https://diysolarforum.com/threads/renogy-devices-and-raspberry-pi-bluetooth-wifi.30235/page-6
           // ff 03 01 00 00 22 d1 f1
           // https://www.lammertbies.nl/comm/info/crc-calculation => CRC-16 (Modbus)	0xF1D1  
 
@@ -368,6 +342,8 @@ void loop() {
           // register, 256 (16 bit)
           // WORDS, 34 (16 bit)
           // crc, 16 bit
+          const uint8_t request[] = { 255, 3, 1, 0, 0, 34, 209, 241 };
+          
           if (!writeCharacteristic.writeValue(request, 8, true)) {
             Serial.println("write failed.");
           }
@@ -416,82 +392,4 @@ void switchCharacteristicWritten(BLEDevice central, BLECharacteristic characteri
   } else {
     Serial.println("LED off");
   }
-}
-
-// ---
-
-bool switch2BleMode() {
-  Serial.println("switch2BleMode");
-
-  WiFi.end();
-  wiFiDrv.wifiDriverDeinit();
-
-  // set advertised local name and service UUID
-  BLE.setDeviceName(BLE_DEVICE_NAME);
-  BLE.setLocalName(BLE_LOCAL_NAME);
-
-  bleStart();
-  bleScan();  
-
-  return true;
-}
-
-void wifiMode() {
-  int connectCount = 0;
-
-  if (wifiStatus != WL_CONNECTED) {
-    while (wifiStatus != WL_CONNECTED) {
-      connectCount++;
-      Serial.print("WiFi attempt: ");
-      Serial.println(connectCount);
-
-      if (connectCount > 10) {
-        networkInitialized = false;
-        wifiModeFlag = false;
-        Serial.println("WiFi connection failed");
-        return;
-      }
-
-      Serial.print("Attempting to connect to SSID: ");
-      Serial.println(ssid);
-
-      wifiStatus = WiFi.begin(ssid, pass);
-
-      if (wifiStatus != WL_CONNECTED) {
-        delay(10000); // wait 10 seconds for connection
-      }
-    }
-
-    printWiFiStatus();
-  }
-}
-
-bool switch2WiFiMode() {
-  BLE.stopAdvertise();
-  BLE.stopScan();
-  BLE.disconnect();
-  BLE.end();
-
-  wifiStatus = WL_IDLE_STATUS;
-
-  // Re-initialize the WiFi driver
-  // This is currently necessary to switch from BLE to WiFi
-  wiFiDrv.wifiDriverDeinit();
-  wiFiDrv.wifiDriverInit();
-
-  return true;
-}
-
-void printWiFiStatus() {
-  Serial.print("SSID: ");
-  Serial.println(WiFi.SSID());
-
-  IPAddress ip = WiFi.localIP();
-  Serial.print("IP address: ");
-  Serial.println(ip);
-
-  long rssi = WiFi.RSSI();
-  Serial.print("Signal strength (RSSI):");
-  Serial.print(rssi);
-  Serial.println(" dBm");
 }
