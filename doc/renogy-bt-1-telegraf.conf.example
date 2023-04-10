@@ -1,0 +1,93 @@
+[[inputs.mqtt_consumer]]
+  name_override = "renogy_bt-1"
+  servers = [
+    "tcp://192.168.0.x:1883"
+  ]
+  topics = [ "renogy/bt-1" ]
+  data_format = "json_v2"
+
+  [[inputs.mqtt_consumer.json_v2]]
+    # measurement_name = "xxx"  # overriden by name_override
+    # time values are not usable since they are not present
+    # timestamp_path = "unixtime"
+    # timestamp_format = "unix"
+
+    # root level
+    [[inputs.mqtt_consumer.json_v2.tag]]
+      path = "function"
+      type = "string"
+    [[inputs.mqtt_consumer.json_v2.field]]
+      path = "battery_percentage"
+      type = "int"
+    [[inputs.mqtt_consumer.json_v2.field]]
+      path = "battery_voltage"
+      type = "float"
+    [[inputs.mqtt_consumer.json_v2.field]]
+      path = "battery_current"
+      type = "float"
+    [[inputs.mqtt_consumer.json_v2.field]]
+      path = "battery_temperature"
+      type = "int"
+    [[inputs.mqtt_consumer.json_v2.field]]
+      path = "controller_temperature"
+      type = "int"
+    [[inputs.mqtt_consumer.json_v2.field]]
+      path = "load_status"
+      type = "string"
+    [[inputs.mqtt_consumer.json_v2.field]]
+      path = "load_voltage"
+      type = "float"
+    [[inputs.mqtt_consumer.json_v2.field]]
+      path = "load_current"
+      type = "float"
+    [[inputs.mqtt_consumer.json_v2.field]]
+      path = "load_power"
+      type = "float"
+    [[inputs.mqtt_consumer.json_v2.field]]
+      path = "pv_voltage"
+      type = "float"
+    [[inputs.mqtt_consumer.json_v2.field]]
+      path = "pv_current"
+      type = "float"
+    [[inputs.mqtt_consumer.json_v2.field]]
+      path = "pv_power"
+      type = "float"
+    [[inputs.mqtt_consumer.json_v2.field]]
+      path = "max_charging_power_today"
+      type = "int"
+    [[inputs.mqtt_consumer.json_v2.field]]
+      path = "max_discharging_power_today"
+      type = "int"
+    [[inputs.mqtt_consumer.json_v2.field]]
+      path = "charging_amp_hours_today"
+      type = "int"
+    [[inputs.mqtt_consumer.json_v2.field]]
+      path = "discharging_amp_hours_today"
+      type = "int"
+    [[inputs.mqtt_consumer.json_v2.field]]
+      path = "power_generation_today"
+      type = "int"
+    [[inputs.mqtt_consumer.json_v2.field]]
+      path = "power_consumption_today"
+      type = "int"
+    [[inputs.mqtt_consumer.json_v2.field]]
+      path = "power_generation_total"
+      type = "int"
+    [[inputs.mqtt_consumer.json_v2.field]]
+      path = "power_generation_total"
+      type = "string"
+    [[inputs.mqtt_consumer.json_v2.field]]
+      path = "charging_status"
+      type = "string"
+
+[[outputs.influxdb_v2]]
+  namepass = [ "renogy_bt-1" ]
+  urls = ["http://192.168.0.x:8086"]
+  token = "INSERT_TOKEN"
+  organization = "Private"
+  bucket = "renogy_bt-1"
+
+#[[outputs.file]]
+#  namepass = [ "renogy_bt-1" ]
+#  files = ["stdout"]
+
