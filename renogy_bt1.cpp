@@ -72,7 +72,8 @@ String *decodeValues(const byte bytes[]) {
     String(bytes_to_int_16(bytes, 41)), // power_generation_today
     String(bytes_to_int_16(bytes, 43)), // power_consumption_today
     String(bytes_to_int_32(bytes, 59)), // power_generation_total
-    String(decodeChargingState(bytes[68])) // charging_state
+    String(decodeChargingState(bytes[68])), // charging_state
+    String((bytes[67] >> 7) ? "true" : "false") // load_status (as boolean)
   };
 
   return decoded_values;
@@ -100,7 +101,8 @@ String buildJson(String decodedValues[]) {
     String("\"power_generation_today\": ") + decodedValues[17] + ", " +
     String("\"power_consumption_today\": ") + decodedValues[18] + ", " +
     String("\"power_generation_total\": ") + decodedValues[19] + ", " +
-    String("\"charging_status\": \"") + decodedValues[20] + "\"" +
+    String("\"charging_status\": \"") + decodedValues[20] + "\", " +
+    String("\"load_status_as_boolean\": ") + decodedValues[21] + "" +
     String("}"); 
 }
 
