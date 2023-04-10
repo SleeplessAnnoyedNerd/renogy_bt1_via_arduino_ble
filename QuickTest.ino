@@ -184,6 +184,7 @@ void processDataFromBt1() {
     const uint8_t request[] = { 255, 3, 1, 0, 0, 34, 209, 241 };
     if (!writeCharacteristic.writeValue(request, 8, true)) {
       Serial.println("BLE characteristic write failed.");
+      properlyConnected = false; // let's restart...
     }      
   }
 }
@@ -401,6 +402,8 @@ void handleBlePeripheral(BLEDevice peripheral) {
         Serial.println("Connected to BLE device.");
       } else {
         Serial.println("Connection failed.");
+        properlyConnected = false;
+        bleScan();
       }
     }
   }
