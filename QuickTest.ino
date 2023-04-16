@@ -115,6 +115,27 @@ void loop() {
   }
 }
 
+const uint8_t* getBytesForReadRequest() {
+  static const uint8_t request[] = { 255, 3, 1, 0, 0, 34, 209, 241 };
+
+  return request;
+}
+
+const uint8_t* getBytesForLoadRequest(bool state) {
+  // Can we do better?
+  if (state) {
+    static const uint8_t request[] = { 0xff, 0x06, 0x01, 0x0a, 0x00, 0x00, 0xbd, 0xea };
+    return request;
+  } else {
+    static const uint8_t request[] = { 0xff, 0x06, 0x01, 0x0a, 0x00, 0x01, 0x7c, 0x2a };
+    return request;
+  }
+}
+
+const uint8_t* getBytesForLoadOffRequest() {
+  return nullptr;
+}
+
 void processDataFromBt1() {
   // nothing to do anymore ... event handler takes over... wrong. :(
 
@@ -181,7 +202,8 @@ void processDataFromBt1() {
 
     rePollCtr = 0;
 
-    const uint8_t request[] = { 255, 3, 1, 0, 0, 34, 209, 241 };
+    // const uint8_t request[] = { 255, 3, 1, 0, 0, 34, 209, 241 };
+    const uint8_t *request = getBytesForReadRequest();
     if (!writeCharacteristic.writeValue(request, 8, true)) {
       Serial.println("BLE characteristic write failed.");
       properlyConnected = false; // let's restart...
