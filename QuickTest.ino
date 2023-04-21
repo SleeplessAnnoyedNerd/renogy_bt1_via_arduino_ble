@@ -6,7 +6,7 @@
 #include "wifi_vs_ble.hpp"
 #include "renogy_bt1.hpp"
 
-#include "secrets.h"
+#include "config.h"
 
 // For efficiency, the Bluetooth® Low Energy (BLE) specification adds support for shortened 16-bit UUIDs.
 // We work with BLE here... so we have to use 16-bit UUIDs (it seems).
